@@ -1,21 +1,23 @@
-import cv2
-import numpy as np
+from PIL import Image
+from diffusers import StableDiffusionImg2ImgPipeline
+import torch
 
-def make_seamless_image(input_path: str, output_path: str):
-    img = cv2.imread(input_path)
-    height, width = img.shape[:2]
+# Stable Diffusion パイプラインの初期化（初回はモデルのDLが必要）
+pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
+    "CompVis/stable-diffusion-v1-4",
+    torch_dtype=torch.float16
+).to("cuda")  # CPUのみ環境では .to("cpu") に変更
 
-    # 正方形にトリミング
-    size = min(height, width)
-    cropped = img[0:size, 0:size]
+def crop_to_square(image: Image.Image) -> Image.Image:
+    width, height = image.size
+    min_edge = min(width, height)
+    left = (width - min_edge) // 2
+    top = (height - min_edge) // 2
+    return image.crop((left, top, left + min_edge, top + min_edge))
 
-    # シームレス化（単純なタイル接続模倣: 左右・上下をブレンド）
-    half = size // 2
-    left = cropped[:, :half]
-    right = cropped[:, half:]
-    blended = cv2.addWeighted(left, 0.5, right, 0.5, 0)
-
-    result = np.hstack([blended, blended])
-    result = np.vstack([result, result])
-
-    cv2.imwrite(output_path, result)
+def process_image(image: Image.Image) -> Image.Image:
+    image = crop_to_square(image)
+    image = image.resize((512, 512))
+    prompt = "a seamless tileable pattern"
+    result = pipe(prompt=prompt, image=image, strength=0.75, guidance_scale=7.5).images[0]
+    return result

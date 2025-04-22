@@ -1,13 +1,31 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Seamless Image Maker</title>
+  <title>画像シームレス化ツール</title>
 </head>
 <body>
-  <h1>画像をアップロードしてシームレス化</h1>
-  <form action="/upload" method="post" enctype="multipart/form-data">
-    <input type="file" name="file" accept="image/*" required />
+  <h1>画像アップロード</h1>
+  <form id="uploadForm">
+    <input type="file" id="imageInput" name="file" accept="image/*" required>
     <button type="submit">送信</button>
   </form>
+  <h2>出力画像:</h2>
+  <img id="resultImage" style="max-width: 500px;"/>
+  <script>
+    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const formData = new FormData();
+      const fileInput = document.getElementById('imageInput');
+      formData.append('file', fileInput.files[0]);
+
+      const response = await fetch('/process_image/', {
+        method: 'POST',
+        body: formData
+      });
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      document.getElementById('resultImage').src = url;
+    });
+  </script>
 </body>
 </html>

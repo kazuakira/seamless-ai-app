@@ -1,29 +1,21 @@
 from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
-import shutil
-import os
-from app.image_processor import make_seamless_image
-import uuid
+from PIL import Image
+import io
+from .image_processor import process_image
 
 app = FastAPI()
 
-app.mount("/static", StaticFiles(directory="app/static"), name="static")
+# 静的ファイル（index.html）を提供
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
-@app.get("/", response_class=HTMLResponse)
-async def index():
-    return FileResponse("app/static/index.html")
+@app.post("/process_image/")
+async def process_image_endpoint(file: UploadFile = File(...)):
+    input_image = Image.open(file.file).convert("RGB")
+    output_image = process_image(input_image)
 
-@app.post("/upload")
-async def upload_image(file: UploadFile = File(...)):
-    input_path = f"temp/{uuid.uuid4()}_input.png"
-    output_path = f"temp/{uuid.uuid4()}_output.png"
-
-    os.makedirs("temp", exist_ok=True)
-
-    with open(input_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    make_seamless_image(input_path, output_path)
-
-    return FileResponse(output_path, media_type="image/png", filename="seamless_output.png")
+    img_byte_arr = io.BytesIO()
+    output_image.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+    return StreamingResponse(img_byte_arr, media_type="image/png")
