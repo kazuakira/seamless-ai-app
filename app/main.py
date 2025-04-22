@@ -1,7 +1,7 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from .image_processor import make_seamless_image
+from image_processor import make_seamless_image
 import io
 
 app = FastAPI()
