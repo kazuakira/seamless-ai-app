@@ -1,8 +1,6 @@
 fastapi
 uvicorn
 pillow
+numpy
+opencv-python-headless
 python-multipart
-diffusers
-transformers
-accelerate
-safetensors

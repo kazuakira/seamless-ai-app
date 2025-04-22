@@ -1,23 +1,34 @@
-from PIL import Image
-from diffusers import StableDiffusionImg2ImgPipeline
-import torch
+from PIL import Image, ImageFilter
+import cv2
+import numpy as np
 
-# Stable Diffusion パイプラインの初期化（初回はモデルのDLが必要）
-pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
-    "CompVis/stable-diffusion-v1-4",
-    torch_dtype=torch.float16
-).to("cuda")  # CPUのみ環境では .to("cpu") に変更
-
-def crop_to_square(image: Image.Image) -> Image.Image:
+def crop_center_square(image: Image.Image) -> Image.Image:
     width, height = image.size
-    min_edge = min(width, height)
-    left = (width - min_edge) // 2
-    top = (height - min_edge) // 2
-    return image.crop((left, top, left + min_edge, top + min_edge))
+    min_dim = min(width, height)
+    left = (width - min_dim) // 2
+    top = (height - min_dim) // 2
+    return image.crop((left, top, left + min_dim, top + min_dim))
 
-def process_image(image: Image.Image) -> Image.Image:
-    image = crop_to_square(image)
-    image = image.resize((512, 512))
-    prompt = "a seamless tileable pattern"
-    result = pipe(prompt=prompt, image=image, strength=0.75, guidance_scale=7.5).images[0]
-    return result
+def swap_left_right(image: Image.Image) -> Image.Image:
+    width, height = image.size
+    left = image.crop((0, 0, width // 2, height))
+    right = image.crop((width // 2, 0, width, height))
+    new_image = Image.new('RGB', (width, height))
+    new_image.paste(right, (0, 0))
+    new_image.paste(left, (width // 2, 0))
+    return new_image
+
+def make_tile_seamless(image: Image.Image) -> Image.Image:
+    img = np.array(image)
+    # ミラーリングで上下左右のつながりを滑らかにする
+    top_bottom = cv2.vconcat([img[::-1,:,:], img, img[::-1,:,:]])
+    seamless = cv2.GaussianBlur(top_bottom, (0, 0), sigmaX=8)
+    mid_h = seamless.shape[0] // 3
+    img_blend = seamless[mid_h:mid_h + img.shape[0], :, :]
+
+    left_right = cv2.hconcat([img_blend[:, ::-1, :], img_blend, img_blend[:, ::-1, :]])
+    seamless2 = cv2.GaussianBlur(left_right, (0, 0), sigmaX=8)
+    mid_w = seamless2.shape[1] // 3
+    final = seamless2[:, mid_w:mid_w + img.shape[1], :]
+
+    return Image.fromarray(final)

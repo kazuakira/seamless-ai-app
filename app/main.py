@@ -1,21 +1,30 @@
 from fastapi import FastAPI, UploadFile, File
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 import io
-from .image_processor import process_image
+from image_processor import swap_left_right, make_tile_seamless, crop_center_square
 
 app = FastAPI()
 
-# 静的ファイル（index.html）を提供
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+# フロントエンドの静的ファイル
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    with open("app/static/index.html", "r", encoding="utf-8") as f:
+        return f.read()
 
 @app.post("/process_image/")
-async def process_image_endpoint(file: UploadFile = File(...)):
-    input_image = Image.open(file.file).convert("RGB")
-    output_image = process_image(input_image)
+async def process_image(file: UploadFile = File(...)):
+    image_data = await file.read()
+    image = Image.open(io.BytesIO(image_data)).convert("RGB")
 
-    img_byte_arr = io.BytesIO()
-    output_image.save(img_byte_arr, format='PNG')
-    img_byte_arr.seek(0)
-    return StreamingResponse(img_byte_arr, media_type="image/png")
+    image = crop_center_square(image)
+    image = swap_left_right(image)
+    image = make_tile_seamless(image)
+
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="image/png")
