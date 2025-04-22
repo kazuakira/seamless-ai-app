@@ -1,32 +1,21 @@
 import cv2
 import numpy as np
-from PIL import Image
-import io
 
-def make_seamless_image(image_bytes: bytes) -> bytes:
-    # PIL で画像読み込み
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+def make_seamless_image(input_path: str, output_path: str):
+    img = cv2.imread(input_path)
+    height, width = img.shape[:2]
 
     # 正方形にトリミング
-    size = min(image.size)
-    left = (image.width - size) // 2
-    top = (image.height - size) // 2
-    image = image.crop((left, top, left + size, top + size))
+    size = min(height, width)
+    cropped = img[0:size, 0:size]
 
-    # OpenCV に変換
-    img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    # シームレス化（単純なタイル接続模倣: 左右・上下をブレンド）
+    half = size // 2
+    left = cropped[:, :half]
+    right = cropped[:, half:]
+    blended = cv2.addWeighted(left, 0.5, right, 0.5, 0)
 
-    # 上下左右に反転拡張
-    bordered = cv2.copyMakeBorder(
-        img_cv, size, size, size, size, borderType=cv2.BORDER_REFLECT
-    )
+    result = np.hstack([blended, blended])
+    result = np.vstack([result, result])
 
-    # 中央を切り抜いて戻す
-    h, w = img_cv.shape[:2]
-    center = bordered[h//2 : h//2 + h, w//2 : w//2 + w]
-
-    # PIL に戻して保存
-    result_img = Image.fromarray(cv2.cvtColor(center, cv2.COLOR_BGR2RGB))
-    output = io.BytesIO()
-    result_img.save(output, format='PNG')
-    return output.getvalue()
+    cv2.imwrite(output_path, result)

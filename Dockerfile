@@ -2,9 +2,7 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-COPY app/static ./app/static
 COPY app/ ./app/
-
 WORKDIR /app/app
 
 RUN pip install --no-cache-dir -r requirements.txt
