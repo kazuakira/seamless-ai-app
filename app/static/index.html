@@ -1,31 +1,30 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
-  <title>画像シームレス化ツール</title>
+    <meta charset="UTF-8">
+    <title>画像シームレス化ツール</title>
 </head>
 <body>
-  <h1>画像アップロード</h1>
-  <form id="uploadForm">
-    <input type="file" id="imageInput" name="file" accept="image/*" required>
-    <button type="submit">送信</button>
-  </form>
-  <h2>出力画像:</h2>
-  <img id="resultImage" style="max-width: 500px;"/>
-  <script>
-    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const formData = new FormData();
-      const fileInput = document.getElementById('imageInput');
-      formData.append('file', fileInput.files[0]);
+    <h1>画像シームレス化ツール</h1>
+    <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" name="file" accept="image/*" required>
+        <button type="submit">送信</button>
+    </form>
+    <div id="result"></div>
 
-      const response = await fetch('/process_image/', {
-        method: 'POST',
-        body: formData
-      });
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      document.getElementById('resultImage').src = url;
-    });
-  </script>
+    <script>
+        const form = document.getElementById('upload-form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const response = await fetch('/process', {
+                method: 'POST',
+                body: formData
+            });
+            const blob = await response.blob();
+            const imgUrl = URL.createObjectURL(blob);
+            document.getElementById('result').innerHTML = `<h3>出力画像:</h3><img src="${imgUrl}" style="max-width:300px;">`;
+        });
+    </script>
 </body>
 </html>

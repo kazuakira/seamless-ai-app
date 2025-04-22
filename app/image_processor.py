@@ -1,23 +1,32 @@
+import cv2
+import numpy as np
 from PIL import Image
-from diffusers import StableDiffusionImg2ImgPipeline
-import torch
+import io
 
-# Stable Diffusion パイプラインの初期化（初回はモデルのDLが必要）
-pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
-    "CompVis/stable-diffusion-v1-4",
-    torch_dtype=torch.float16
-).to("cuda")  # CPUのみ環境では .to("cpu") に変更
+def make_seamless_image(image_bytes: bytes) -> bytes:
+    # PIL で画像読み込み
+    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-def crop_to_square(image: Image.Image) -> Image.Image:
-    width, height = image.size
-    min_edge = min(width, height)
-    left = (width - min_edge) // 2
-    top = (height - min_edge) // 2
-    return image.crop((left, top, left + min_edge, top + min_edge))
+    # 正方形にトリミング
+    size = min(image.size)
+    left = (image.width - size) // 2
+    top = (image.height - size) // 2
+    image = image.crop((left, top, left + size, top + size))
 
-def process_image(image: Image.Image) -> Image.Image:
-    image = crop_to_square(image)
-    image = image.resize((512, 512))
-    prompt = "a seamless tileable pattern"
-    result = pipe(prompt=prompt, image=image, strength=0.75, guidance_scale=7.5).images[0]
-    return result
+    # OpenCV に変換
+    img_cv = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+
+    # 上下左右に反転拡張
+    bordered = cv2.copyMakeBorder(
+        img_cv, size, size, size, size, borderType=cv2.BORDER_REFLECT
+    )
+
+    # 中央を切り抜いて戻す
+    h, w = img_cv.shape[:2]
+    center = bordered[h//2 : h//2 + h, w//2 : w//2 + w]
+
+    # PIL に戻して保存
+    result_img = Image.fromarray(cv2.cvtColor(center, cv2.COLOR_BGR2RGB))
+    output = io.BytesIO()
+    result_img.save(output, format='PNG')
+    return output.getvalue()
